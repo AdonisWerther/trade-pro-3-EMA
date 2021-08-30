@@ -1,0 +1,224 @@
+//@version=4
+study(title="3 EMA Stochastic RSI Strategy", shorttitle="Pro Trade 3 EMA", overlay=true, max_labels_count=100, max_bars_back=500, precision=0)
+
+//EMAs
+
+len1 = input(8, minval=1, title="MA Length 1")
+len2 = input(14, minval=1, title="MA Length 2")
+len3 = input(50, minval=1, title="MA Length 3")
+src = input(close, title="MA Source")
+
+out1 = ema(src, len1)
+out2 = ema(src, len2)
+out3 = ema(src, len3)
+
+//Stochastic RSI
+
+smoothK = input(3, "Stochastic K", minval=1)
+smoothD = input(3, "Stochastic D", minval=1)
+lengthRSI = input(14, "RSI Length", minval=1)
+lengthStoch = input(14, "Stochastic Length", minval=1)
+treshold1 = input(80, "Crossover treshold", minval=1)
+treshold2 = input(20, "Crossunder treshold", minval=1)
+src2 = input(close, title="RSI Source")
+rsi1 = rsi(src2, lengthRSI)
+k = sma(stoch(rsi1, rsi1, rsi1, lengthStoch), smoothK)
+d = sma(k, smoothD)
+
+
+//Supertrend 
+atrPeriod = input(16, "ATR Length")
+factor = input(3, "ATR Factor")
+
+[supertrend, direction] = supertrend(factor, atrPeriod)
+upTrend = plot(direction < 0 ? supertrend : na, "Up Trend", color = color.new(color.silver,50), style=plot.style_linebr)
+downTrend = plot(direction < 0? na : supertrend, "Down Trend", color = color.new(color.silver,50), style=plot.style_linebr)
+
+
+// Plots
+
+p1 = plot(out1, title="EMA 1", color=color.new(color.orange,100))
+p2 = plot(out2, title="EMA 2", color=color.new(color.yellow,100))
+p3 = plot(out3, title="EMA 3", color=color.new(color.blue,100))
+
+fill(p1, p2, color = out1 > out2 ? color.new(color.aqua, 60) : color.new(color.yellow, 60))
+fill(p2, p3, color = out2 > out3 ? color.new(color.teal, 60) : color.new(color.orange, 60))
+
+takeprofit1 =  out1 < out2 and out2 < out3 and crossunder(out1, out3)
+
+takeprofit2 =  out1 > out2 and out2 > out3 and crossover(out1, out3)
+
+
+tresholdlong = k and d < treshold2 and crossover(k,d)
+tresholdshort = k and d > treshold1 and crossunder(k,d)
+
+longCondition = out1 > out2 and out2 > out3 and out1 > out3 and tresholdlong
+shortCondition = out1 < out2 and out2 < out3 and out1 < out3 and tresholdshort
+
+
+plotshape(shortCondition, style=shape.labeldown, size=size.tiny, text="Sell", textcolor=color.new(color.white,0), color=color.new(color.orange,30), location=location.abovebar)
+plotshape(longCondition, style=shape.labeldown, size=size.tiny, text="Buy", textcolor=color.new(color.white,0), color=color.new(color.teal,30), location=location.abovebar)
+
+plotshape(takeprofit1, style=shape.arrowdown, size=size.small, text="TP", textcolor=color.new(color.white,40), color=color.new(color.white,40), location=location.abovebar)
+plotshape(takeprofit2, style=shape.arrowup, size=size.small, text="TP", textcolor=color.new(color.white,40), color=color.new(color.white,40), location=location.belowbar)
+
+
+// Trend lines
+
+
+startyear = input(defval = 2020, title = "Start Year")
+startmonth = input(defval = 1, title = "Start Month")
+startday = input(defval = 1, title = "Start day")
+prd2 = input(defval = 20, title="Pivot Point Period", minval = 10, maxval = 50)
+PPnum = input(defval = 3, title="Number of Pivot Point to check", minval = 2, maxval = 3)
+
+float ph2 = na, float pl2 = na
+ph2 := pivothigh(prd2, prd2)
+pl2 := pivotlow(prd2, prd2)
+
+getloc(bar_i)=>
+    _ret = bar_index + prd2 - bar_i 
+    
+//get last 3  pivot highs - (hope to have Array in Pine version 5)
+t1pos = valuewhen(ph2, bar_index, 0)
+t1val = nz(high[getloc(t1pos)])
+t2pos = valuewhen(ph2, bar_index, 1)
+t2val = nz(high[getloc(t2pos)])
+t3pos = valuewhen(ph2, bar_index, 2)
+t3val = nz(high[getloc(t3pos)])
+//get last 3 pivot lows 
+b1pos = valuewhen(pl2, bar_index, 0)
+b1val = nz(low[getloc(b1pos)])
+b2pos = valuewhen(pl2, bar_index, 1)
+b2val = nz(low[getloc(b2pos)])
+b3pos = valuewhen(pl2, bar_index, 2)
+b3val = nz(low[getloc(b3pos)])
+
+getloval(l1, l2)=>
+    _ret1 = l1 == 1 ? b1val : l1 == 2 ? b2val : l1 ==3 ? b3val : 0
+    _ret2 = l2 == 1 ? b1val : l2 == 2 ? b2val : l2 ==3 ? b3val : 0
+    [_ret1, _ret2]
+
+getlopos(l1, l2)=>
+    _ret1 = l1 == 1 ? b1pos : l1 == 2 ? b2pos : l1 ==3 ? b3pos : 0
+    _ret2 = l2 == 1 ? b1pos : l2 == 2 ? b2pos : l2 ==3 ? b3pos : 0
+    [_ret1, _ret2]
+
+gethival(l1, l2)=>
+    _ret1 = l1 == 1 ? t1val : l1 == 2 ? t2val : l1 ==3 ? t3val : 0
+    _ret2 = l2 == 1 ? t1val : l2 == 2 ? t2val : l2 ==3 ? t3val :  0
+    [_ret1, _ret2]
+
+gethipos(l1, l2)=>
+    _ret1 = l1 == 1 ? t1pos : l1 == 2 ? t2pos : l1 ==3 ? t3pos : 0
+    _ret2 = l2 == 1 ? t1pos : l2 == 2 ? t2pos : l2 ==3 ? t3pos :  0
+    [_ret1, _ret2]
+
+// line definitions
+var line l11 = na, var line l21 = na, var line l31 = na
+var line t11 = na, var line t21 = na, var line t31 = na
+
+//delete old lines
+line.delete(l11), line.delete(l21), line.delete(l31)
+line.delete(t11), line.delete(t21), line.delete(t31)
+
+// there is limitation for number of lines on chart (<=50), and we use 20 uptrend lines + 20 downtrend lines (total 40) 
+maxline = 3
+
+//Line coloring
+ulcolor = color.new(color.orange,50)
+dlcolor = color.new(color.aqua,50)
+
+// loop for pivot points to check if there is possible trend line
+countlinelo = 0
+countlinehi = 0
+
+starttime = timestamp(startyear, startmonth, startday, 0, 0, 0)
+
+if time >= starttime
+    for p1 = 1 to PPnum - 1 
+        uv1 = 0.0
+        uv2 = 0.0
+        up1 = 0
+        up2 = 0
+        if countlinelo <= maxline
+            for p2 = PPnum to p1 + 1
+                [val1, val2] = getloval(p1, p2)
+                [pos1, pos2] = getlopos(p1, p2)
+                if val1 > val2
+                    diff = (val1 - val2) / (pos1 - pos2)
+                    hline = val2 + diff
+                    lloc = bar_index
+                    lval = low
+                    valid = true
+                    xc = 0
+                    for x = pos2 + 1 - prd2 to bar_index
+                        xc := x
+                        if nz(close[getloc(x + prd2)]) < hline
+                            valid := false
+                            break
+                        lloc := x
+                        lval := hline
+                        hline := hline + diff
+                    
+                        
+                    if valid
+                        uv1 := hline
+                        uv2 := val2
+                        up1 := lloc
+                        up2 := pos2
+                        break
+
+        dv1 = 0.0
+        dv2 = 0.0
+        dp1 = 0
+        dp2 = 0                
+        if countlinehi <= maxline
+            for p2 = PPnum to p1 + 1                
+                [val1, val2] = gethival(p1, p2)
+                [pos1, pos2] = gethipos(p1, p2)
+                if val1 < val2
+                    diff = (val2 - val1) / (pos1 - pos2)
+                    hline = val2 - diff
+                    lloc = bar_index
+                    lval = high
+                    valid = true
+                    xc = 0
+                    for x = pos2 + 1 - prd2 to bar_index
+                        xc := x
+                        if nz(close[getloc(x + prd2)]) > hline
+                            valid := false
+                            break
+                        lloc := x
+                        lval := hline
+                        hline := hline - diff
+                        
+                    if valid
+                        dv1 := hline
+                        dv2 := val2
+                        dp1 := lloc
+                        dp2 := pos2
+                        break
+                        
+        // if there is continues uptrend line then draw it
+        if up1 != 0 and up2 != 0 and countlinelo < maxline
+            countlinelo := countlinelo + 1
+            l11 := countlinelo == 1 ? line.new(up2 - prd2, uv2, up1, uv1) : l11
+            l21 := countlinelo == 2 ? line.new(up2 - prd2, uv2, up1, uv1) : l21
+            l31 := countlinelo == 3 ? line.new(up2 - prd2, uv2, up1, uv1) : l31
+        
+        // if there is continues downtrend line then draw it
+        if dp1 != 0 and dp2 != 0 and countlinehi < maxline
+            countlinehi := countlinehi + 1
+            t11 := countlinehi == 1 ? line.new(dp2 - prd2, dv2, dp1, dv1) : t11
+            t21 := countlinehi == 2 ? line.new(dp2 - prd2, dv2, dp1, dv1) : t21
+            t31 := countlinehi == 3 ? line.new(dp2 - prd2, dv2, dp1, dv1) : t31
+            
+            
+
+//Label 
+
+alertcondition(takeprofit1, title='Take Profit', message='Take Profit')
+alertcondition(takeprofit2, title='Take Profit', message='Take Profit')
+alertcondition(shortCondition, title='Bearish Entry Signal', message='Bearish Entry Signal')
+alertcondition(longCondition, title='Bullish Entry Signal', message='Bullish Entry Signal')
